@@ -13,112 +13,86 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async () => {
-    if (!username.trim() || !password.trim()) { setError('Please fill in all fields'); return }
-    if (username.includes(' ')) { setError('Username cannot contain spaces'); return }
-    if (password.length < 6) { setError('Password must be at least 6 characters'); return }
-    setLoading(true)
-    setError('')
+    if (!username.trim() || !password.trim()) { setError('Fill in all fields'); return }
+    if (username.includes(' ')) { setError('No spaces in username'); return }
+    if (password.length < 6) { setError('Password needs 6+ characters'); return }
+    setLoading(true); setError('')
     const email = `${username.toLowerCase()}@cassette.local`
-
     if (isSignUp) {
       const { error } = await supabase.auth.signUp({ email, password })
       if (error) { setError(error.message); setLoading(false); return }
-      router.push('/dashboard')
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) { setError('Wrong username or password'); setLoading(false); return }
-      router.push('/dashboard')
     }
+    router.push('/dashboard')
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex' }}>
-      {/* Left panel */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '3rem', borderRight: '1px solid var(--border)', maxWidth: '480px' }}>
-        <div className="fade-up">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '4rem' }}>
-            <span style={{ fontSize: '1.4rem' }}>📼</span>
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: 'var(--text)' }}>Cassette</span>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-body)', padding: '1.5rem', position: 'relative', overflow: 'hidden' }}>
+
+      {/* Background decoration */}
+      <div style={{ position: 'absolute', top: '-80px', right: '-80px', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(245,200,66,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: '-80px', left: '-80px', width: '350px', height: '350px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(90,143,224,0.05) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
+      <div style={{ display: 'flex', width: '100%', maxWidth: '900px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,0.5)' }}>
+
+        {/* Left: form */}
+        <div className="fade-up" style={{ flex: 1, padding: '3.5rem 3rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
+          <div style={{ marginBottom: '2.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+              <span className="cassette-tape">📼</span>
+              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.6rem', letterSpacing: '-0.02em' }}>Cassette Manager</span>
+            </div>
+            <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>Study smarter. Stay organised. Ace it.</p>
           </div>
 
-          <div style={{ marginBottom: '2.5rem' }}>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2.4rem', lineHeight: 1.2, marginBottom: '0.75rem', color: 'var(--text)' }}>
-              {isSignUp ? 'Create your account.' : 'Welcome back.'}
-            </h1>
-            <p style={{ color: 'var(--muted)', fontSize: '0.95rem' }}>
-              {isSignUp ? 'Start managing your studies.' : 'Sign in to continue.'}
-            </p>
+          {/* Toggle */}
+          <div style={{ display: 'flex', background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: '4px', marginBottom: '2rem', border: '1px solid var(--border)' }}>
+            {['Login', 'Sign Up'].map((t, i) => (
+              <button key={t} onClick={() => { setIsSignUp(i === 1); setError('') }} style={{ flex: 1, padding: '0.55rem', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: 700, fontSize: '0.88rem', fontFamily: 'var(--font-display)', transition: 'all 0.2s', background: (i === 1) === isSignUp ? 'var(--accent)' : 'transparent', color: (i === 1) === isSignUp ? 'var(--accent-fg)' : 'var(--muted)' }}>{t}</button>
+            ))}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--muted)', marginBottom: '0.4rem', letterSpacing: '0.08em' }}>USERNAME</label>
-              <input
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-                placeholder="your_username"
-                style={{ width: '100%', padding: '0.8rem 1rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text)', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s', fontFamily: 'var(--font-mono)' }}
-                onFocus={e => e.target.style.borderColor = 'var(--text)'}
-                onBlur={e => e.target.style.borderColor = 'var(--border)'}
-              />
+              <label style={{ display: 'block', fontSize: '0.72rem', fontFamily: 'var(--font-mono)', color: 'var(--muted)', marginBottom: '0.4rem', letterSpacing: '0.1em' }}>USERNAME</label>
+              <input className="input-field" value={username} onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSubmit()} placeholder="your_username" />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--muted)', marginBottom: '0.4rem', letterSpacing: '0.08em' }}>PASSWORD</label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-                placeholder="••••••••"
-                style={{ width: '100%', padding: '0.8rem 1rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text)', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s', fontFamily: 'var(--font-mono)' }}
-                onFocus={e => e.target.style.borderColor = 'var(--text)'}
-                onBlur={e => e.target.style.borderColor = 'var(--border)'}
-              />
+              <label style={{ display: 'block', fontSize: '0.72rem', fontFamily: 'var(--font-mono)', color: 'var(--muted)', marginBottom: '0.4rem', letterSpacing: '0.1em' }}>PASSWORD</label>
+              <input className="input-field" type="password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSubmit()} placeholder="••••••••" />
             </div>
           </div>
 
-          {error && (
-            <div style={{ background: '#fdf2f2', border: '1px solid #f5c6c6', borderRadius: 'var(--radius)', padding: '0.7rem 1rem', marginBottom: '1rem', color: 'var(--danger)', fontSize: '0.85rem', fontFamily: 'var(--font-mono)' }}>
-              {error}
-            </div>
-          )}
+          {error && <div style={{ background: 'rgba(224,90,78,0.12)', border: '1px solid rgba(224,90,78,0.3)', borderRadius: 'var(--radius)', padding: '0.7rem 1rem', marginBottom: '1rem', color: 'var(--red)', fontSize: '0.85rem' }}>⚠️ {error}</div>}
 
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            style={{ width: '100%', padding: '0.85rem', background: 'var(--accent)', color: 'var(--accent-fg)', border: 'none', borderRadius: 'var(--radius)', fontSize: '0.9rem', fontWeight: '600', letterSpacing: '0.02em', opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}
-          >
-            {loading ? 'Please wait...' : isSignUp ? 'Create Account' : 'Sign In'}
+          <button className="btn-primary" onClick={handleSubmit} disabled={loading} style={{ width: '100%', padding: '0.9rem', fontSize: '1rem', opacity: loading ? 0.6 : 1 }}>
+            {loading ? 'Loading...' : isSignUp ? '🚀 Create Account' : '▶ Sign In'}
           </button>
 
-          <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem', marginTop: '1.2rem' }}>
-            {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
-            <span onClick={() => { setIsSignUp(!isSignUp); setError('') }} style={{ color: 'var(--text)', fontWeight: '600', cursor: 'pointer', textDecoration: 'underline' }}>
-              {isSignUp ? 'Sign in' : 'Sign up'}
-            </span>
-          </p>
+          {isSignUp && <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '0.8rem', marginTop: '1rem' }}>No email needed — just username & password</p>}
         </div>
 
-        <p style={{ color: 'var(--muted)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>No email required. Just username + password.</p>
-      </div>
-
-      {/* Right panel */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '3rem', gap: '2rem' }}>
-        {[
-          { icon: '📚', label: 'Subjects', desc: 'Organise by course' },
-          { icon: '✅', label: 'To-Do Lists', desc: 'Track assignments' },
-          { icon: '📅', label: 'Calendar', desc: 'Never miss deadlines' },
-          { icon: '🧠', label: 'Notes', desc: 'Quick revision points' },
-        ].map((f, i) => (
-          <div key={f.label} className={`fade-up-${i + 1}`} style={{ display: 'flex', alignItems: 'center', gap: '1.2rem', padding: '1.2rem 1.5rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: '340px' }}>
-            <span style={{ fontSize: '1.8rem' }}>{f.icon}</span>
-            <div>
-              <div style={{ fontWeight: '600', fontSize: '0.95rem' }}>{f.label}</div>
-              <div style={{ color: 'var(--muted)', fontSize: '0.82rem' }}>{f.desc}</div>
+        {/* Right: feature highlights */}
+        <div className="fade-up-2" style={{ flex: 1, background: 'var(--surface2)', borderLeft: '1px solid var(--border)', padding: '3.5rem 2.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '1.2rem' }}>
+          <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', color: 'var(--accent)', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>EVERYTHING YOU NEED</p>
+          {[
+            { icon: '📚', title: 'Subjects', desc: 'Organise notes, media & tasks per course' },
+            { icon: '✅', title: 'To-Do Lists', desc: 'Folders, checkboxes, progress tracking' },
+            { icon: '📅', title: 'Calendar', desc: 'Deadlines, events & reminders' },
+            { icon: '🧠', title: 'Notes', desc: 'Quick points you can revisit anytime' },
+            { icon: '🎨', title: 'Themes', desc: 'Light & dark modes with custom colours' },
+          ].map((f, i) => (
+            <div key={f.title} className={`fade-up-${Math.min(i + 2, 5)}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', padding: '1rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+              <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>{f.icon}</span>
+              <div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.1rem' }}>{f.title}</div>
+                <div style={{ color: 'var(--muted)', fontSize: '0.8rem', lineHeight: 1.4 }}>{f.desc}</div>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   )

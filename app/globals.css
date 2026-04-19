@@ -1,32 +1,26 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Syne+Mono&family=Nunito:wght@400;500;600;700&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #f7f5f0;
-  --surface: #ffffff;
-  --border: #e0ddd6;
-  --text: #1a1814;
-  --muted: #8a8780;
-  --accent: #1a1814;
-  --accent-fg: #f7f5f0;
-  --danger: #c0392b;
-  --success: #27ae60;
-  --font-display: 'DM Serif Display', serif;
-  --font-body: 'DM Sans', sans-serif;
-  --font-mono: 'DM Mono', monospace;
-  --radius: 4px;
-  --radius-lg: 8px;
-}
-
-[data-theme="dark"] {
-  --bg: #111010;
-  --surface: #1c1b1a;
-  --border: #2a2926;
-  --text: #f0ede8;
-  --muted: #6a6760;
-  --accent: #f0ede8;
-  --accent-fg: #111010;
+  --bg: #0e0e0e;
+  --surface: #1a1a1a;
+  --surface2: #222222;
+  --border: #2e2e2e;
+  --text: #f0ece4;
+  --muted: #707070;
+  --accent: #f5c842;
+  --accent-dark: #d4a820;
+  --accent-fg: #0e0e0e;
+  --red: #e05a4e;
+  --green: #5ab97a;
+  --blue: #5a8fe0;
+  --font-display: 'Syne', sans-serif;
+  --font-body: 'Nunito', sans-serif;
+  --font-mono: 'Syne Mono', monospace;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
 }
 
 body {
@@ -42,18 +36,87 @@ a { color: inherit; text-decoration: none; }
 button { font-family: var(--font-body); cursor: pointer; }
 input, select, textarea { font-family: var(--font-body); }
 
-::selection { background: var(--text); color: var(--bg); }
-
-::-webkit-scrollbar { width: 6px; }
+::selection { background: var(--accent); color: var(--accent-fg); }
+::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-.fade-up { animation: fadeUp 0.4s ease forwards; }
-.fade-up-2 { animation: fadeUp 0.4s 0.1s ease forwards; opacity: 0; }
-.fade-up-3 { animation: fadeUp 0.4s 0.2s ease forwards; opacity: 0; }
-.fade-up-4 { animation: fadeUp 0.4s 0.3s ease forwards; opacity: 0; }
+.fade-up  { animation: fadeUp 0.45s ease forwards; }
+.fade-up-2 { animation: fadeUp 0.45s 0.08s ease forwards; opacity: 0; }
+.fade-up-3 { animation: fadeUp 0.45s 0.16s ease forwards; opacity: 0; }
+.fade-up-4 { animation: fadeUp 0.45s 0.24s ease forwards; opacity: 0; }
+.fade-up-5 { animation: fadeUp 0.45s 0.32s ease forwards; opacity: 0; }
+
+.card-hover {
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent) !important;
+  box-shadow: 0 8px 24px rgba(245,200,66,0.08);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.7rem 1.4rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.12s;
+  letter-spacing: 0.02em;
+}
+.btn-primary:hover { background: var(--accent-dark); transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 1.2rem;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.18s, color 0.18s;
+}
+.btn-ghost:hover { border-color: var(--text); color: var(--text); }
+
+.input-field {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-family: var(--font-body);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.input-field:focus { border-color: var(--accent); }
+.input-field::placeholder { color: var(--muted); }
+
+.tab-active {
+  color: var(--accent) !important;
+  border-bottom: 2px solid var(--accent) !important;
+}
+
+.cassette-tape {
+  display: inline-block;
+  font-size: 2rem;
+  animation: wobble 3s ease-in-out infinite;
+}
+@keyframes wobble {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
