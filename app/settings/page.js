@@ -1,96 +1,87 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-const themes = {
-  dark: [
-    { name: 'Purple Night', bg: '#0f0f0f', card: '#1a1a1a', accent: '#7c6fcd' },
-    { name: 'Ocean Dark', bg: '#0a0f1e', card: '#111827', accent: '#4ecdc4' },
-    { name: 'Red Dark', bg: '#110a0a', card: '#1a1010', accent: '#ff6b6b' },
-    { name: 'Green Dark', bg: '#0a110a', card: '#101a10', accent: '#6bcb77' },
-  ],
-  light: [
-    { name: 'Clean White', bg: '#f5f5f5', card: '#ffffff', accent: '#7c6fcd' },
-    { name: 'Sky Blue', bg: '#e8f4fd', card: '#ffffff', accent: '#4ecdc4' },
-    { name: 'Warm Sand', bg: '#fdf6ec', card: '#ffffff', accent: '#e8935a' },
-    { name: 'Mint Fresh', bg: '#edfdf5', card: '#ffffff', accent: '#6bcb77' },
-  ]
-}
+const THEMES = [
+  { id: 'springfield',     label: '☀️ Springfield Days',    desc: 'Sunny yellow & warm cream' },
+  { id: 'spartans-rage',   label: '⚔️ Spartan\'s Rage',     desc: 'Deep red & battle-worn grey' },
+  { id: 'the-invincible',  label: '🦸 The Invincible',      desc: 'Royal blue & electric yellow' },
+  { id: 'nolans-daughter', label: '🌸 Nolan\'s Daughter',   desc: 'Rose pink & sage green' },
+  { id: 'quahog-dad',      label: '🍺 Quahog Dad',          desc: 'Earthy olive & warm brown' },
+  { id: 'man-of-steel',    label: '🔵 Man of Steel',        desc: 'Cobalt blue & gold' },
+  { id: 'dark-knight',     label: '🦇 The Dark Knight',     desc: 'Near-black & golden spark' },
+  { id: 'web-slinger',     label: '🕷️ Web Slinger',         desc: 'Bold red & deep navy' },
+  { id: 'wakanda',         label: '💜 Wakanda Forever',     desc: 'Royal purple & silver' },
+  { id: 'emerald-archer',  label: '🏹 Emerald Archer',      desc: 'Forest green & earthy gold' },
+]
 
 export default function SettingsPage() {
   const router = useRouter()
-  const [mode, setMode] = useState('dark')
-  const [selectedTheme, setSelectedTheme] = useState(0)
+  const [profile, setProfile] = useState(null)
+  const [current, setCurrent] = useState('springfield')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     const load = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
-    }
-    const saved = localStorage.getItem('cm-theme')
-    if (saved) {
-      const parsed = JSON.parse(saved)
-      setMode(parsed.mode)
-      setSelectedTheme(parsed.index)
+      if (!session) { router.replace('/login'); return }
+      const { data: prof } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
+      if (!prof) { router.replace('/login'); return }
+      setProfile(prof)
+      setCurrent(prof.theme || 'springfield')
+      document.documentElement.setAttribute('data-theme', prof.theme || 'springfield')
     }
     load()
   }, [])
 
-  const applyTheme = (m, i) => {
-    setMode(m)
-    setSelectedTheme(i)
-    localStorage.setItem('cm-theme', JSON.stringify({ mode: m, index: i }))
+  const applyTheme = async (themeId) => {
+    setCurrent(themeId)
+    document.documentElement.setAttribute('data-theme', themeId)
+    setSaving(true); setSaved(false)
+    await supabase.from('profiles').update({ theme: themeId }).eq('id', profile.id)
+    setSaving(false); setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
   }
 
-  const theme = themes[mode][selectedTheme]
-  const textColor = mode === 'dark' ? 'white' : '#111'
-  const subColor = mode === 'dark' ? '#888' : '#555'
+  if (!profile) return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Nunito, sans-serif' }}>
+      <p style={{ color: 'var(--muted)', fontWeight: 700 }}>Loading...</p>
+    </div>
+  )
 
   return (
-    <div style={{ minHeight: '100vh', background: theme.bg, color: textColor, fontFamily: 'sans-serif', transition: 'all 0.3s' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 2rem', borderBottom: `1px solid ${mode === 'dark' ? '#222' : '#ddd'}` }}>
-        <Link href="/dashboard" style={{ color: subColor, textDecoration: 'none' }}>← Back</Link>
-        <h1 style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>⚙️ Settings</h1>
-        <div />
-      </div>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', fontFamily: 'Nunito, sans-serif', color: 'var(--text)' }}>
+      <nav style={{ background: 'var(--surface)', borderBottom: '2px solid var(--border)', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ maxWidth: '900px', margin: '0 auto', padding: '0 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '64px' }}>
+          <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontWeight: 800, color: 'var(--muted)', fontSize: '.88rem' }}>← Back</Link>
+          <span style={{ fontWeight: 900, fontSize: '1.05rem' }}>🎨 Theme Settings</span>
+          <div style={{ width: '60px' }} />
+        </div>
+      </nav>
 
-      <div style={{ maxWidth: '600px', margin: '2rem auto', padding: '0 2rem' }}>
-        {/* Mode Toggle */}
-        <h2 style={{ marginBottom: '1rem', color: subColor, fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Mode</h2>
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
-          {['dark', 'light'].map(m => (
-            <button key={m} onClick={() => applyTheme(m, 0)} style={{ flex: 1, padding: '1rem', borderRadius: '12px', border: `2px solid ${mode === m ? theme.accent : 'transparent'}`, background: m === 'dark' ? '#1a1a1a' : '#f0f0f0', color: m === 'dark' ? 'white' : '#111', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', transition: 'all 0.2s' }}>
-              {m === 'dark' ? '🌙 Dark' : '☀️ Light'}
-            </button>
-          ))}
+      <main style={{ maxWidth: '700px', margin: '0 auto', padding: '2.5rem 1.5rem' }}>
+        <div className="fade-up" style={{ marginBottom: '2rem', textAlign: 'center' }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '.5rem' }}>Your Theme</h1>
+          <p style={{ color: 'var(--muted)', fontWeight: 600 }}>Pick your vibe. It saves instantly and works on all your devices.</p>
+          {saved && <div style={{ marginTop: '.75rem', display: 'inline-block', background: 'var(--accent-light)', color: 'var(--text)', padding: '.35rem 1rem', borderRadius: '99px', fontSize: '.82rem', fontWeight: 800 }}>✅ Theme saved!</div>}
         </div>
 
-        {/* Sub Themes */}
-        <h2 style={{ marginBottom: '1rem', color: subColor, fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Color Theme</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          {themes[mode].map((t, i) => (
-            <button key={i} onClick={() => applyTheme(mode, i)} style={{ padding: '1.2rem', borderRadius: '12px', border: `2px solid ${selectedTheme === i ? t.accent : 'transparent'}`, background: t.card, cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: t.accent }} />
-                <span style={{ color: mode === 'dark' ? 'white' : '#111', fontWeight: selectedTheme === i ? 'bold' : 'normal' }}>{t.name}</span>
+        <div className="fade-up-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '.85rem' }}>
+          {THEMES.map(t => (
+            <div key={t.id} data-theme={t.id} onClick={() => applyTheme(t.id)} style={{ padding: '1.1rem 1.3rem', background: 'var(--surface)', border: `2.5px solid ${current === t.id ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '20px', cursor: 'pointer', transition: 'all .18s', transform: current === t.id ? 'translateY(-3px)' : 'none', boxShadow: current === t.id ? '0 6px 20px rgba(0,0,0,.12)' : 'var(--card-shadow)', display: 'flex', alignItems: 'center', gap: '.9rem' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '99px', background: 'var(--accent)', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,.15)' }} />
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '.88rem', color: 'var(--text)' }}>{t.label}</div>
+                <div style={{ color: 'var(--muted)', fontSize: '.75rem', fontWeight: 600 }}>{t.desc}</div>
               </div>
-            </button>
+              {current === t.id && <div style={{ marginLeft: 'auto', fontSize: '1rem' }}>✓</div>}
+            </div>
           ))}
         </div>
-
-        {/* Preview */}
-        <h2 style={{ marginBottom: '1rem', marginTop: '2rem', color: subColor, fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Preview</h2>
-        <div style={{ background: theme.card, borderRadius: '12px', padding: '1.5rem', border: `1px solid ${mode === 'dark' ? '#2a2a2a' : '#ddd'}` }}>
-          <div style={{ fontWeight: 'bold', color: textColor, marginBottom: '0.5rem' }}>Sample Subject Card</div>
-          <div style={{ color: subColor, fontSize: '0.85rem', marginBottom: '1rem' }}>Prof. Example</div>
-          <div style={{ background: theme.bg, borderRadius: '999px', height: '8px' }}>
-            <div style={{ background: theme.accent, width: '65%', height: '8px', borderRadius: '999px' }} />
-          </div>
-          <div style={{ color: theme.accent, fontSize: '0.8rem', marginTop: '0.5rem' }}>65% complete</div>
-        </div>
-      </div>
+      </main>
     </div>
   )
 }
