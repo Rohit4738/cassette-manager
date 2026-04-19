@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import '@/app/globals.css'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -15,8 +14,10 @@ export default function Dashboard() {
   useEffect(() => {
     const load = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
-      setUser(session.user)
+      if (!session) { router.replace('/login'); return }
+      const meta = session.user.user_metadata
+      if (!meta?.username) { router.replace('/login'); return }
+      setUser({ ...session.user, username: meta.username })
       const { data: subs } = await supabase.from('subjects').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false })
       const { data: evts } = await supabase.from('events').select('*').eq('user_id', session.user.id)
       const { data: todos } = await supabase.from('todos').select('*').eq('user_id', session.user.id)
@@ -31,69 +32,97 @@ export default function Dashboard() {
     load()
   }, [])
 
-  const logout = async () => { await supabase.auth.signOut(); router.push('/login') }
+  const logout = async () => { await supabase.auth.signOut(); router.replace('/login') }
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-body)' }}>
       <div style={{ textAlign: 'center' }}>
-        <span style={{ fontSize: '3rem', display: 'block', marginBottom: '1rem' }}>📼</span>
+        <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📼</div>
         <p style={{ color: 'var(--muted)' }}>Loading your workspace...</p>
       </div>
     </div>
   )
 
-  const username = user?.email?.replace('@cassette.local', '')
   const today = new Date()
   const hour = today.getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
-  const deadlines = events.filter(e => e.deadline).map(e => ({ ...e, daysLeft: Math.ceil((new Date(e.deadline) - today) / 86400000) })).filter(e => e.daysLeft >= 0).sort((a, b) => a.daysLeft - b.daysLeft)
+  const deadlines = events
+    .filter(e => e.deadline)
+    .map(e => ({ ...e, daysLeft: Math.ceil((new Date(e.deadline) - today) / 86400000) }))
+    .filter(e => e.daysLeft >= 0)
+    .sort((a, b) => a.daysLeft - b.daysLeft)
 
-  const subjectColors = ['#f5c842', '#5ab97a', '#5a8fe0', '#e05a4e', '#c77dff', '#ff9f43']
+  const subjectAccents = [
+    { color: '#2c3e6b', bg: '#e8ecf5' },
+    { color: '#c85c3a', bg: '#f0e8e4' },
+    { color: '#3a7d5c', bg: '#e4f0eb' },
+    { color: '#7c5cbf', bg: '#f0ebfb' },
+    { color: '#b8860b', bg: '#fdf6e0' },
+    { color: '#c0392b', bg: '#fdecea' },
+  ]
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', fontFamily: 'var(--font-body)', color: 'var(--text)' }}>
 
       {/* Nav */}
-      <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 2.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)', position: 'sticky', top: 0, zIndex: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <span style={{ fontSize: '1.3rem' }}>📼</span>
-          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.01em' }}>Cassette Manager</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {[['📚', 'Subjects', '/subjects'], ['📅', 'Calendar', '/calendar'], ['⚙️', 'Settings', '/settings']].map(([icon, label, href]) => (
-            <Link key={href} href={href} className="btn-ghost" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.9rem' }}>
-              <span>{icon}</span><span style={{ fontSize: '0.85rem' }}>{label}</span>
-            </Link>
-          ))}
-          <button onClick={logout} className="btn-ghost" style={{ marginLeft: '0.5rem' }}>Sign out</button>
+      <nav style={{ background: 'var(--surface)', borderBottom: '1.5px solid var(--border)', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '60px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <div style={{ width: '30px', height: '30px', background: 'var(--accent)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>📼</div>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontStyle: 'italic' }}>Cassette Manager</span>
+            </div>
+            <div style={{ display: 'flex', gap: '0.25rem' }}>
+              <Link href="/subjects" className="nav-link">📚 Subjects</Link>
+              <Link href="/calendar" className="nav-link">📅 Event Calendar</Link>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent)', cursor: 'pointer' }}
+              title={user?.username}
+            >
+              {user?.username?.[0]?.toUpperCase()}
+            </div>
+            <button onClick={logout} className="btn-ghost" style={{ fontSize: '0.82rem' }}>Sign out</button>
+          </div>
         </div>
       </nav>
 
       <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2.5rem 2rem' }}>
 
-        {/* Hero greeting */}
+        {/* Greeting */}
         <div className="fade-up" style={{ marginBottom: '2.5rem' }}>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '2.6rem', letterSpacing: '-0.03em', lineHeight: 1.15 }}>
-            {greeting}, <span style={{ color: 'var(--accent)' }}>{username}</span> 👋
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2.4rem', fontStyle: 'italic', lineHeight: 1.2 }}>
+            {greeting}, <span style={{ color: 'var(--accent)' }}>{user?.username}</span>.
           </h1>
-          <p style={{ color: 'var(--muted)', marginTop: '0.4rem', fontSize: '0.95rem' }}>
-            {today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+          <p style={{ color: 'var(--muted)', marginTop: '0.3rem' }}>
+            {today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            {' · '}{subjects.length} subject{subjects.length !== 1 ? 's' : ''} · {deadlines.filter(d => d.daysLeft <= 7).length} upcoming deadline{deadlines.filter(d => d.daysLeft <= 7).length !== 1 ? 's' : ''}
           </p>
         </div>
 
-        {/* Stats */}
-        <div className="fade-up-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '2.5rem' }}>
-          {[
-            { label: 'Subjects', value: subjects.length, icon: '📚', color: '#f5c842', link: '/subjects' },
-            { label: 'Events', value: events.length, icon: '📅', color: '#5a8fe0', link: '/calendar' },
-            { label: 'Due soon', value: deadlines.filter(d => d.daysLeft <= 7).length, icon: '⏰', color: '#e05a4e', link: '/calendar' },
-          ].map(s => (
-            <Link key={s.label} href={s.link} className="card-hover" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1.5rem', display: 'block', position: 'relative', overflow: 'hidden' }}>
-              <div style={{ position: 'absolute', top: '-20px', right: '-20px', fontSize: '5rem', opacity: 0.06 }}>{s.icon}</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 800, color: s.color, marginBottom: '0.25rem' }}>{s.value}</div>
-              <div style={{ color: 'var(--muted)', fontSize: '0.85rem', fontWeight: 600 }}>{s.label}</div>
-            </Link>
-          ))}
+        {/* Quick actions */}
+        <div className="fade-up-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '2.5rem' }}>
+          <Link href="/subjects/new" style={{ background: 'var(--navy)', color: 'white', borderRadius: 'var(--radius-lg)', padding: '1.4rem 1.6rem', display: 'flex', alignItems: 'center', gap: '1rem', transition: 'opacity 0.18s, transform 0.18s', boxShadow: 'var(--shadow)' }}
+            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+          >
+            <div style={{ width: '44px', height: '44px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>📚</div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '1rem' }}>New Subject</div>
+              <div style={{ fontSize: '0.82rem', opacity: 0.7, marginTop: '0.1rem' }}>Add a course to track</div>
+            </div>
+          </Link>
+          <Link href="/calendar" style={{ background: 'var(--accent)', color: 'white', borderRadius: 'var(--radius-lg)', padding: '1.4rem 1.6rem', display: 'flex', alignItems: 'center', gap: '1rem', transition: 'opacity 0.18s, transform 0.18s', boxShadow: '0 4px 14px rgba(200,92,58,0.25)' }}
+            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+          >
+            <div style={{ width: '44px', height: '44px', background: 'rgba(255,255,255,0.15)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>📅</div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '1rem' }}>Add Event</div>
+              <div style={{ fontSize: '0.82rem', opacity: 0.7, marginTop: '0.1rem' }}>Schedule or set a deadline</div>
+            </div>
+          </Link>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '1.5rem' }}>
@@ -101,29 +130,32 @@ export default function Dashboard() {
           {/* Subjects */}
           <div className="fade-up-3">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.15rem' }}>📚 Your Subjects</h2>
-              <Link href="/subjects/new" className="btn-primary" style={{ padding: '0.4rem 1rem', fontSize: '0.82rem' }}>+ New</Link>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: '1.25rem' }}>Subjects</h2>
+              <Link href="/subjects" style={{ fontSize: '0.82rem', color: 'var(--muted)', fontWeight: 600 }}>View all →</Link>
             </div>
             {subjects.length === 0 ? (
-              <div style={{ border: '2px dashed var(--border)', borderRadius: 'var(--radius-lg)', padding: '3rem', textAlign: 'center' }}>
-                <p style={{ color: 'var(--muted)', marginBottom: '1rem' }}>No subjects yet!</p>
-                <Link href="/subjects/new" className="btn-primary">Create first subject</Link>
+              <div style={{ border: '2px dashed var(--border2)', borderRadius: 'var(--radius-lg)', padding: '3rem', textAlign: 'center' }}>
+                <p style={{ color: 'var(--muted)', marginBottom: '1rem', fontSize: '0.9rem' }}>No subjects yet</p>
+                <Link href="/subjects/new" className="btn-primary">+ Create first subject</Link>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {subjects.slice(0, 6).map((sub, i) => {
+                {subjects.slice(0, 5).map((sub, i) => {
                   const pct = sub.total === 0 ? 0 : Math.round((sub.done / sub.total) * 100)
-                  const color = subjectColors[i % subjectColors.length]
+                  const accent = subjectAccents[i % subjectAccents.length]
                   return (
-                    <Link key={sub.id} href={`/subjects/${sub.id}`} className="card-hover" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1.1rem 1.3rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                      <div style={{ width: '4px', height: '40px', background: color, borderRadius: '2px', flexShrink: 0 }} />
+                    <Link key={sub.id} href={`/subjects/${sub.id}`} className="card" style={{ padding: '1rem 1.2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <div style={{ width: '5px', height: '44px', background: accent.color, borderRadius: '3px', flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.4rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub.name}</div>
-                        <div style={{ background: 'var(--border)', borderRadius: '999px', height: '4px' }}>
-                          <div style={{ background: color, width: `${pct}%`, height: '4px', borderRadius: '999px', transition: 'width 0.5s' }} />
+                        <div style={{ fontWeight: 700, fontSize: '0.92rem', marginBottom: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub.name}</div>
+                        <div className="progress-bar-track" style={{ height: '5px' }}>
+                          <div className="progress-bar-fill" style={{ width: `${pct}%`, background: accent.color }} />
                         </div>
                       </div>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--muted)', flexShrink: 0 }}>{pct}%</div>
+                      <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 700, color: accent.color }}>{pct}%</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>{sub.done}/{sub.total}</div>
+                      </div>
                     </Link>
                   )
                 })}
@@ -134,28 +166,30 @@ export default function Dashboard() {
           {/* Deadlines */}
           <div className="fade-up-4">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.15rem' }}>⏰ Deadlines</h2>
-              <Link href="/calendar" className="btn-ghost" style={{ padding: '0.35rem 0.8rem', fontSize: '0.8rem' }}>View all</Link>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: '1.25rem' }}>Deadlines</h2>
+              <Link href="/calendar" style={{ fontSize: '0.82rem', color: 'var(--muted)', fontWeight: 600 }}>Calendar →</Link>
             </div>
             {deadlines.length === 0 ? (
-              <div style={{ border: '2px dashed var(--border)', borderRadius: 'var(--radius-lg)', padding: '2rem', textAlign: 'center' }}>
-                <p style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>🎉</p>
-                <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>No upcoming deadlines!</p>
+              <div style={{ border: '2px dashed var(--border2)', borderRadius: 'var(--radius-lg)', padding: '2.5rem', textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🎉</div>
+                <p style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>No upcoming deadlines!</p>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {deadlines.slice(0, 6).map(evt => {
                   const urgent = evt.daysLeft <= 3
                   const soon = evt.daysLeft <= 7
+                  const badgeColor = urgent ? '#c85c3a' : soon ? '#b8860b' : '#3a7d5c'
+                  const badgeBg = urgent ? '#fef2f0' : soon ? '#fdf6e0' : '#e4f0eb'
                   return (
-                    <div key={evt.id} style={{ background: urgent ? 'rgba(224,90,78,0.08)' : 'var(--surface)', border: `1px solid ${urgent ? 'rgba(224,90,78,0.3)' : 'var(--border)'}`, borderRadius: 'var(--radius-lg)', padding: '1rem 1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ minWidth: 0, flex: 1 }}>
+                    <div key={evt.id} className="card" style={{ padding: '1rem 1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderColor: urgent ? '#f5c4bb' : 'var(--border)' }}>
+                      <div style={{ minWidth: 0 }}>
                         <div style={{ fontWeight: 700, fontSize: '0.88rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{evt.title}</div>
-                        <div style={{ color: 'var(--muted)', fontSize: '0.75rem', fontFamily: 'var(--font-mono)', marginTop: '0.15rem' }}>{evt.deadline}</div>
+                        <div style={{ color: 'var(--muted)', fontSize: '0.75rem', marginTop: '0.1rem' }}>{evt.deadline}</div>
                       </div>
-                      <div style={{ marginLeft: '0.75rem', flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: '0.82rem', fontWeight: 700, color: urgent ? 'var(--red)' : soon ? '#ff9f43' : 'var(--muted)', background: urgent ? 'rgba(224,90,78,0.15)' : 'var(--surface2)', padding: '0.2rem 0.6rem', borderRadius: '999px' }}>
+                      <span className="badge" style={{ marginLeft: '0.75rem', background: badgeBg, color: badgeColor, flexShrink: 0 }}>
                         {evt.daysLeft === 0 ? 'TODAY' : `${evt.daysLeft}d`}
-                      </div>
+                      </span>
                     </div>
                   )
                 })}
