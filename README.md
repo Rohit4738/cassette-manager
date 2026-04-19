@@ -1,40 +1,133 @@
-<<<<<<< HEAD
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+<div align="center">
 
-## Getting Started
+```text
+   _____                           _   _        __  __
+  / ____|                         | | | |      |  \/  |
+ | |     __ _ ___ ___  ___ _ __   | |_| |_ __ _| \  / | __ _ _ __   __ _  __ _  ___ _ __
+ | |    / _` / __/ __|/ _ \ '__|  | __| __/ _` | |\/| |/ _` | '_ \ / _` |/ _` |/ _ \ '__|
+ | |___| (_| \__ \__ \  __/ |     | |_| || (_| | |  | | (_| | | | | (_| | (_| |  __/ |
+  \_____\__,_|___/___/\___|_|      \__|\__\__,_|_|  |_|\__,_|_| |_|\__,_|\__, |\___|_|
+                                                                            __/ |
+                                                                           |___/
+```
 
-First, run the development server:
+### 📼 Cassette Manager
+
+A retro-inspired **student productivity platform** built with Next.js + Supabase for managing subjects, tasks, deadlines, notes, and study resources in one clean workspace.
+
+</div>
+
+---
+
+## ✨ Why this project stands out
+
+Cassette Manager combines product thinking, frontend design, and backend integration in one full-stack app:
+
+- **Authentication flow** with Supabase Auth (signup/login)
+- **Subject-centric workspace** for each course
+- **Task system with folders** and completion progress tracking
+- **Calendar + deadlines** with browser reminder notifications
+- **Notes + media links** per subject for quick revision
+- **Dashboard analytics** (subjects, events, due-soon indicators)
+- **Theme customization** (dark/light + color palettes)
+
+---
+
+## 🧱 Tech Stack
+
+- **Frontend:** Next.js (App Router), React
+- **Backend-as-a-Service:** Supabase (Auth + Postgres)
+- **Styling:** CSS + design tokens in `app/globals.css`
+- **Tooling:** ESLint
+
+---
+
+## 🗂️ Project Structure
+
+```text
+app/
+  login/              # Auth screen
+  dashboard/          # Overview + analytics
+  subjects/           # Subject listing + CRUD
+  subjects/new/       # Create subject
+  subjects/[id]/      # Subject workspace (todos, notes, media)
+  calendar/           # Event + deadline planning
+  settings/           # Theme preferences
+lib/
+  supabase.js         # Supabase client initialization
+```
+
+---
+
+## 🚀 Getting Started
+
+### 1) Install dependencies
+
+```bash
+npm ci
+```
+
+### 2) Set environment variables
+
+Create `.env.local` in the project root:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### 3) Start development server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then open: `http://localhost:3000`
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🧪 Available Scripts
 
-## Learn More
+```bash
+npm run dev    # Run local development server
+npm run build  # Create production build
+npm run start  # Start production server
+npm run lint   # Run ESLint
+```
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🗃️ Supabase Data Model (high level)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The app expects these core tables:
 
-## Deploy on Vercel
+- `subjects`
+- `todos`
+- `todo_folders`
+- `events`
+- `notes`
+- `media`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+All user-specific data is scoped via `user_id`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-=======
-# cassette-manager
->>>>>>> 2bda4ea648bfc793965a1169f446fd65bdfe2acb
+---
+
+## 🎯 Resume-ready highlights
+
+- Designed and shipped a **full-stack productivity SaaS prototype**
+- Built **modular feature pages** using Next.js App Router
+- Integrated **real-time backend services** using Supabase SDK
+- Implemented **multi-entity relational data workflows** (subjects, tasks, events, notes, media)
+- Crafted a **custom visual identity** with theme support and polished UI interactions
+
+---
+
+## 📌 Status
+
+Actively evolving. Great base for adding:
+
+- recurring tasks/events
+- rich text notes
+- attachment uploads
+- collaboration features
+
