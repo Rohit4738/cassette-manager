@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import '@/app/globals.css'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -12,119 +13,129 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const getUser = async () => {
+    const load = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
       setUser(session.user)
-      
-      const { data: subs } = await supabase.from('subjects').select('*').eq('user_id', session.user.id)
+      const { data: subs } = await supabase.from('subjects').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false })
       const { data: evts } = await supabase.from('events').select('*').eq('user_id', session.user.id)
-      setSubjects(subs || [])
+      const { data: todos } = await supabase.from('todos').select('*').eq('user_id', session.user.id)
+      setSubjects((subs || []).map(s => ({
+        ...s,
+        total: (todos || []).filter(t => t.subject_id === s.id).length,
+        done: (todos || []).filter(t => t.subject_id === s.id && t.completed).length
+      })))
       setEvents(evts || [])
       setLoading(false)
     }
-    getUser()
+    load()
   }, [])
 
-  const logout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
-  }
+  const logout = async () => { await supabase.auth.signOut(); router.push('/login') }
 
-  if (loading) return <div style={loadingStyle}>Loading...</div>
+  if (loading) return <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-body)', color: 'var(--muted)' }}>Loading...</div>
 
-  const username = user?.email?.replace('@cassette.app', '')
+  const username = user?.email?.replace('@cassette.local', '')
   const today = new Date()
-  const upcomingEvents = events.filter(e => e.deadline && new Date(e.deadline) >= today)
-    .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
-    .slice(0, 3)
+  const deadlines = events.filter(e => e.deadline).map(e => ({ ...e, daysLeft: Math.ceil((new Date(e.deadline) - today) / 86400000) })).filter(e => e.daysLeft >= 0).sort((a, b) => a.daysLeft - b.daysLeft)
 
   return (
-    <div style={pageStyle}>
-      {/* Header */}
-      <div style={headerStyle}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>📼 Cassette</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={{ color: '#888' }}>Hey, {username}!</span>
-          <button onClick={logout} style={logoutBtn}>Logout</button>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', fontFamily: 'var(--font-body)', color: 'var(--text)' }}>
+      {/* Top nav */}
+      <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem 2.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <span style={{ fontSize: '1.2rem' }}>📼</span>
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem' }}>Cassette</span>
         </div>
-      </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+          <Link href="/subjects" style={{ color: 'var(--muted)', fontSize: '0.9rem', fontWeight: '500' }}>Subjects</Link>
+          <Link href="/calendar" style={{ color: 'var(--muted)', fontSize: '0.9rem', fontWeight: '500' }}>Calendar</Link>
+          <Link href="/settings" style={{ color: 'var(--muted)', fontSize: '0.9rem', fontWeight: '500' }}>Settings</Link>
+          <button onClick={logout} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--muted)', padding: '0.4rem 0.9rem', borderRadius: 'var(--radius)', fontSize: '0.85rem' }}>Sign out</button>
+        </div>
+      </nav>
 
-      <div style={contentStyle}>
-        {/* Quick Actions */}
-        <h2 style={sectionTitle}>Quick Actions</h2>
-        <div style={gridStyle}>
-          <Link href="/subjects" style={actionCard('#7c6fcd')}>
-            <div style={{ fontSize: '2rem' }}>📚</div>
-            <div style={{ fontWeight: 'bold' }}>Subjects</div>
-            <div style={{ color: '#ccc', fontSize: '0.85rem' }}>{subjects.length} subjects</div>
-          </Link>
-          <Link href="/calendar" style={actionCard('#4ecdc4')}>
-            <div style={{ fontSize: '2rem' }}>📅</div>
-            <div style={{ fontWeight: 'bold' }}>Calendar</div>
-            <div style={{ color: '#ccc', fontSize: '0.85rem' }}>{events.length} events</div>
-          </Link>
-          <Link href="/subjects/new" style={actionCard('#ff6b6b')}>
-            <div style={{ fontSize: '2rem' }}>➕</div>
-            <div style={{ fontWeight: 'bold' }}>Add Subject</div>
-            <div style={{ color: '#ccc', fontSize: '0.85rem' }}>Create new</div>
-          </Link>
-          <Link href="/settings" style={actionCard('#f7dc6f')}>
-            <div style={{ fontSize: '2rem' }}>⚙️</div>
-            <div style={{ fontWeight: 'bold', color: '#333' }}>Settings</div>
-            <div style={{ color: '#555', fontSize: '0.85rem' }}>Themes & more</div>
-          </Link>
+      <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '3rem 2.5rem' }}>
+        {/* Header */}
+        <div className="fade-up" style={{ marginBottom: '3rem' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2.8rem', lineHeight: 1.15, marginBottom: '0.5rem' }}>
+            Good {today.getHours() < 12 ? 'morning' : today.getHours() < 17 ? 'afternoon' : 'evening'}, {username}.
+          </h1>
+          <p style={{ color: 'var(--muted)', fontSize: '1rem' }}>
+            {today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          </p>
         </div>
 
-        {/* Subjects Overview */}
-        <h2 style={sectionTitle}>Your Subjects</h2>
-        {subjects.length === 0 ? (
-          <div style={emptyCard}>
-            No subjects yet. <Link href="/subjects/new" style={{ color: '#7c6fcd' }}>Create one!</Link>
-          </div>
-        ) : (
-          <div style={gridStyle}>
-            {subjects.map(sub => (
-              <Link key={sub.id} href={`/subjects/${sub.id}`} style={subjectCard}>
-                <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{sub.name}</div>
-                <div style={{ color: '#888', fontSize: '0.85rem' }}>Prof. {sub.professor || 'N/A'}</div>
-              </Link>
-            ))}
-          </div>
-        )}
+        {/* Stats row */}
+        <div className="fade-up-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '3rem' }}>
+          {[
+            { label: 'Subjects', value: subjects.length, icon: '📚', link: '/subjects' },
+            { label: 'Events', value: events.length, icon: '📅', link: '/calendar' },
+            { label: 'Deadlines', value: deadlines.filter(d => d.daysLeft <= 7).length, icon: '⏰', link: '/calendar' },
+          ].map(s => (
+            <Link key={s.label} href={s.link} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1.5rem', display: 'block', transition: 'border-color 0.2s' }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--text)'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+            >
+              <div style={{ fontSize: '1.5rem', marginBottom: '0.75rem' }}>{s.icon}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', marginBottom: '0.2rem' }}>{s.value}</div>
+              <div style={{ color: 'var(--muted)', fontSize: '0.85rem', fontFamily: 'var(--font-mono)' }}>{s.label}</div>
+            </Link>
+          ))}
+        </div>
 
-        {/* Upcoming Deadlines */}
-        <h2 style={sectionTitle}>Upcoming Deadlines</h2>
-        {upcomingEvents.length === 0 ? (
-          <div style={emptyCard}>No upcoming deadlines 🎉</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {upcomingEvents.map(evt => {
-              const daysLeft = Math.ceil((new Date(evt.deadline) - today) / (1000 * 60 * 60 * 24))
-              return (
-                <div key={evt.id} style={deadlineCard}>
-                  <div style={{ fontWeight: 'bold' }}>{evt.title}</div>
-                  <div style={{ color: daysLeft <= 5 ? '#ff6b6b' : '#4ecdc4', fontSize: '0.85rem' }}>
-                    {daysLeft} days left
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+          {/* Subjects */}
+          <div className="fade-up-3">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem' }}>Subjects</h2>
+              <Link href="/subjects/new" style={{ fontSize: '0.82rem', fontFamily: 'var(--font-mono)', color: 'var(--muted)', border: '1px solid var(--border)', padding: '0.3rem 0.8rem', borderRadius: 'var(--radius)' }}>+ New</Link>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {subjects.length === 0 && <p style={{ color: 'var(--muted)', fontSize: '0.9rem', padding: '1.5rem', border: '1px dashed var(--border)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>No subjects yet</p>}
+              {subjects.slice(0, 5).map(sub => {
+                const pct = sub.total === 0 ? 0 : Math.round((sub.done / sub.total) * 100)
+                return (
+                  <Link key={sub.id} href={`/subjects/${sub.id}`} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1rem 1.2rem', display: 'block', transition: 'border-color 0.2s' }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--text)'}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{sub.name}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--muted)' }}>{pct}%</span>
+                    </div>
+                    <div style={{ background: 'var(--border)', borderRadius: '999px', height: '3px' }}>
+                      <div style={{ background: 'var(--text)', width: `${pct}%`, height: '3px', borderRadius: '999px', transition: 'width 0.5s' }} />
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Deadlines */}
+          <div className="fade-up-4">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem' }}>Upcoming Deadlines</h2>
+              <Link href="/calendar" style={{ fontSize: '0.82rem', fontFamily: 'var(--font-mono)', color: 'var(--muted)', border: '1px solid var(--border)', padding: '0.3rem 0.8rem', borderRadius: 'var(--radius)' }}>+ New</Link>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {deadlines.length === 0 && <p style={{ color: 'var(--muted)', fontSize: '0.9rem', padding: '1.5rem', border: '1px dashed var(--border)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>No upcoming deadlines 🎉</p>}
+              {deadlines.slice(0, 5).map(evt => (
+                <div key={evt.id} style={{ background: 'var(--surface)', border: `1px solid ${evt.daysLeft <= 3 ? '#f5c6c6' : 'var(--border)'}`, borderRadius: 'var(--radius-lg)', padding: '1rem 1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: '600', fontSize: '0.9rem', marginBottom: '0.15rem' }}>{evt.title}</div>
+                    <div style={{ color: 'var(--muted)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>{evt.deadline}</div>
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', color: evt.daysLeft <= 3 ? 'var(--danger)' : evt.daysLeft <= 7 ? '#e67e22' : 'var(--muted)', fontWeight: '600' }}>
+                    {evt.daysLeft === 0 ? 'Today' : `${evt.daysLeft}d`}
                   </div>
                 </div>
-              )
-            })}
+              ))}
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      </main>
     </div>
   )
 }
-
-const pageStyle = { minHeight: '100vh', background: '#0f0f0f', color: 'white', fontFamily: 'sans-serif' }
-const headerStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 2rem', borderBottom: '1px solid #222', position: 'sticky', top: 0, background: '#0f0f0f', zIndex: 10 }
-const contentStyle = { padding: '2rem', maxWidth: '1100px', margin: '0 auto' }
-const sectionTitle = { fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1rem', marginTop: '2rem', color: '#ccc' }
-const gridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }
-const actionCard = (bg) => ({ background: bg, borderRadius: '12px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', textDecoration: 'none', color: 'white', cursor: 'pointer' })
-const subjectCard = { background: '#1a1a1a', borderRadius: '12px', padding: '1.5rem', textDecoration: 'none', color: 'white', border: '1px solid #2a2a2a', display: 'block' }
-const deadlineCard = { background: '#1a1a1a', borderRadius: '12px', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #2a2a2a' }
-const emptyCard = { background: '#1a1a1a', borderRadius: '12px', padding: '1.5rem', color: '#888', textAlign: 'center' }
-const logoutBtn = { background: 'transparent', border: '1px solid #444', color: '#888', padding: '0.4rem 1rem', borderRadius: '8px', cursor: 'pointer' }
-const loadingStyle = { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f0f0f', color: 'white', fontFamily: 'sans-serif' }
