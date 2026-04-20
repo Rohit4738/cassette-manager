@@ -1,8 +1,9 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { BookOpen, Calendar, Plus, LogOut, Settings, User, ChevronDown, Palette } from 'lucide-react'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -10,6 +11,8 @@ export default function Dashboard() {
   const [subjects, setSubjects] = useState([])
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef(null)
 
   useEffect(() => {
     const load = async () => {
@@ -17,7 +20,7 @@ export default function Dashboard() {
       if (!session) { router.replace('/login'); return }
       const { data: prof } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
       if (!prof?.username) { router.replace('/login'); return }
-      document.documentElement.setAttribute('data-theme', prof.theme || 'springfield')
+      document.documentElement.setAttribute('data-theme', prof.theme || 'clean-white')
       setProfile(prof)
       const { data: subs } = await supabase.from('subjects').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false })
       const { data: evts } = await supabase.from('events').select('*').eq('user_id', session.user.id)
@@ -31,15 +34,27 @@ export default function Dashboard() {
       setLoading(false)
     }
     load()
+
+    // Close menu on outside click
+    const handleClick = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  const logout = async () => { await supabase.auth.signOut(); router.replace('/login') }
+  const logout = async () => {
+    await supabase.auth.signOut()
+    router.replace('/login')
+  }
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Nunito, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Nunito, sans-serif' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '3rem', marginBottom: '.75rem' }}>📼</div>
-        <p style={{ color: 'var(--muted)', fontWeight: 700 }}>Loading your workspace...</p>
+        <div style={{ width: '48px', height: '48px', background: '#1a1a1a', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+          <BookOpen size={24} color="#fff" />
+        </div>
+        <p style={{ color: '#999', fontWeight: 600 }}>Loading your workspace...</p>
       </div>
     </div>
   )
@@ -47,9 +62,11 @@ export default function Dashboard() {
   const today = new Date()
   const hour = today.getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
-  const deadlines = events.filter(e => e.deadline)
+  const deadlines = events
+    .filter(e => e.deadline)
     .map(e => ({ ...e, daysLeft: Math.ceil((new Date(e.deadline) - today) / 86400000) }))
-    .filter(e => e.daysLeft >= 0).sort((a, b) => a.daysLeft - b.daysLeft)
+    .filter(e => e.daysLeft >= 0)
+    .sort((a, b) => a.daysLeft - b.daysLeft)
 
   const accentColors = ['#e05a4e','#3b5bdb','#c2185b','#2e7d32','#b8860b','#6a0dad','#1565c0','#c62828','#7a6040','#2e7d32']
 
@@ -59,30 +76,76 @@ export default function Dashboard() {
       {/* Nav */}
       <nav style={{ background: 'var(--surface)', borderBottom: '2px solid var(--border)', position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '64px' }}>
+
+          {/* Logo + nav links */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-              <div style={{ width: '34px', height: '34px', background: 'var(--accent)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}>📼</div>
+              <div style={{ width: '34px', height: '34px', background: 'var(--accent)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <BookOpen size={18} color="var(--accent-fg)" />
+              </div>
               <span style={{ fontWeight: 900, fontSize: '1.05rem' }}>Cassette Manager</span>
             </div>
             <div style={{ display: 'flex', gap: '.2rem' }} className="hide-mobile">
-              <Link href="/subjects" className="pill-nav">📚 Subjects</Link>
-              <Link href="/calendar" className="pill-nav">📅 Event Calendar</Link>
+              <Link href="/subjects" className="pill-nav" style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                <BookOpen size={15} /> Subjects
+              </Link>
+              <Link href="/calendar" className="pill-nav" style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                <Calendar size={15} /> Event Calendar
+              </Link>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-            <Link href="/settings" className="btn-ghost hide-mobile">🎨 Theme</Link>
-            <div style={{ width: '34px', height: '34px', borderRadius: '99px', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: 'var(--accent-fg)', fontSize: '.9rem', cursor: 'pointer' }}>
-              {profile?.username?.[0]?.toUpperCase()}
-            </div>
-            <button onClick={logout} className="btn-ghost" style={{ fontSize: '.82rem' }}>Sign out</button>
-          </div>
-        </div>
-        {/* Mobile nav */}
-        <div style={{ display: 'none' }} className="mobile-nav">
-          <div style={{ display: 'flex', justifyContent: 'space-around', padding: '.5rem', borderTop: '2px solid var(--border)' }}>
-            <Link href="/subjects" className="pill-nav" style={{ fontSize: '.8rem' }}>📚 Subjects</Link>
-            <Link href="/calendar" className="pill-nav" style={{ fontSize: '.8rem' }}>📅 Calendar</Link>
-            <Link href="/settings" className="pill-nav" style={{ fontSize: '.8rem' }}>🎨 Theme</Link>
+
+          {/* Profile menu */}
+          <div style={{ position: 'relative' }} ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              style={{ display: 'flex', alignItems: 'center', gap: '.5rem', background: 'var(--surface2)', border: '2px solid var(--border)', borderRadius: '99px', padding: '.35rem .35rem .35rem .5rem', cursor: 'pointer', transition: 'border-color .18s' }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--border2)'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+            >
+              <div style={{ width: '28px', height: '28px', borderRadius: '99px', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: 'var(--accent-fg)', fontSize: '.85rem' }}>
+                {profile?.username?.[0]?.toUpperCase()}
+              </div>
+              <span style={{ fontWeight: 700, fontSize: '.85rem', color: 'var(--text2)' }} className="hide-mobile">{profile?.username}</span>
+              <ChevronDown size={14} color="var(--muted)" />
+            </button>
+
+            {/* Dropdown */}
+            {menuOpen && (
+              <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', background: 'var(--surface)', border: '2px solid var(--border)', borderRadius: '18px', padding: '.5rem', minWidth: '220px', boxShadow: '0 8px 32px rgba(0,0,0,.12)', zIndex: 200 }}>
+
+                {/* Profile info */}
+                <div style={{ padding: '.75rem 1rem', borderBottom: '1.5px solid var(--border)', marginBottom: '.5rem' }}>
+                  <div style={{ fontWeight: 800, fontSize: '.92rem' }}>{profile?.username}</div>
+                  <div style={{ color: 'var(--muted)', fontSize: '.78rem', fontWeight: 600, marginTop: '.1rem' }}>{profile?.email}</div>
+                </div>
+
+                {/* Menu items */}
+                {[
+                  { icon: <User size={15} />, label: 'Profile', href: '/profile' },
+                  { icon: <Palette size={15} />, label: 'Change Theme', href: '/settings' },
+                  { icon: <Settings size={15} />, label: 'Settings', href: '/settings' },
+                ].map(item => (
+                  <Link key={item.label} href={item.href} onClick={() => setMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.65rem 1rem', borderRadius: '12px', color: 'var(--text2)', fontWeight: 700, fontSize: '.88rem', transition: 'background .15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <span style={{ color: 'var(--muted)' }}>{item.icon}</span>
+                    {item.label}
+                  </Link>
+                ))}
+
+                <div style={{ borderTop: '1.5px solid var(--border)', marginTop: '.5rem', paddingTop: '.5rem' }}>
+                  <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.65rem 1rem', borderRadius: '12px', color: '#c0392b', fontWeight: 700, fontSize: '.88rem', background: 'transparent', border: 'none', width: '100%', cursor: 'pointer', transition: 'background .15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#fdecea'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <LogOut size={15} />
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </nav>
@@ -92,22 +155,24 @@ export default function Dashboard() {
         {/* Greeting */}
         <div className="fade-up" style={{ marginBottom: '2rem' }}>
           <h1 style={{ fontSize: '2.2rem', fontWeight: 900, lineHeight: 1.2 }} className="mobile-text-sm">
-            {greeting}, <span style={{ color: 'var(--accent)' }}>{profile?.username}</span>! 👋
+            {greeting}, <span style={{ color: 'var(--accent)' }}>{profile?.username}</span>
           </h1>
           <p style={{ color: 'var(--muted)', marginTop: '.3rem', fontWeight: 600 }}>
             {today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             {' · '}{subjects.length} subject{subjects.length !== 1 ? 's' : ''}
-            {deadlines.filter(d => d.daysLeft <= 7).length > 0 && ` · ⚠️ ${deadlines.filter(d => d.daysLeft <= 7).length} deadline${deadlines.filter(d => d.daysLeft <= 7).length !== 1 ? 's' : ''} this week`}
+            {deadlines.filter(d => d.daysLeft <= 7).length > 0 && ` · ${deadlines.filter(d => d.daysLeft <= 7).length} deadline${deadlines.filter(d => d.daysLeft <= 7).length !== 1 ? 's' : ''} this week`}
           </p>
         </div>
 
         {/* Quick actions */}
         <div className="fade-up-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
-          <Link href="/subjects/new" style={{ background: 'var(--accent)', color: 'var(--accent-fg)', borderRadius: '20px', padding: '1.3rem 1.5rem', display: 'flex', alignItems: 'center', gap: '.9rem', fontWeight: 800, boxShadow: '0 4px 16px rgba(0,0,0,.12)', transition: 'transform .18s' }}
+          <Link href="/subjects/new" style={{ background: 'var(--accent)', color: 'var(--accent-fg)', borderRadius: '20px', padding: '1.3rem 1.5rem', display: 'flex', alignItems: 'center', gap: '.9rem', fontWeight: 800, boxShadow: '0 4px 16px rgba(0,0,0,.10)', transition: 'transform .18s' }}
             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
           >
-            <span style={{ fontSize: '1.8rem' }}>📚</span>
+            <div style={{ width: '42px', height: '42px', background: 'rgba(255,255,255,.15)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Plus size={22} color="var(--accent-fg)" />
+            </div>
             <div>
               <div style={{ fontSize: '.95rem' }}>New Subject</div>
               <div style={{ fontSize: '.78rem', opacity: .75, fontWeight: 600 }}>Add a course</div>
@@ -117,7 +182,9 @@ export default function Dashboard() {
             onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = 'var(--accent)' }}
             onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--border)' }}
           >
-            <span style={{ fontSize: '1.8rem' }}>📅</span>
+            <div style={{ width: '42px', height: '42px', background: 'var(--accent-light)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Calendar size={22} color="var(--accent)" />
+            </div>
             <div>
               <div style={{ fontSize: '.95rem', color: 'var(--text)' }}>Add Event</div>
               <div style={{ fontSize: '.78rem', color: 'var(--muted)', fontWeight: 600 }}>Set a deadline</div>
@@ -131,13 +198,15 @@ export default function Dashboard() {
           <div className="fade-up-3">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ fontWeight: 900, fontSize: '1.1rem' }}>Your Subjects</h2>
-              <Link href="/subjects" style={{ color: 'var(--accent)', fontWeight: 800, fontSize: '.85rem' }}>View all →</Link>
+              <Link href="/subjects" style={{ color: 'var(--accent)', fontWeight: 800, fontSize: '.85rem' }}>View all</Link>
             </div>
             {subjects.length === 0 ? (
               <div style={{ border: '2.5px dashed var(--border2)', borderRadius: '20px', padding: '3rem', textAlign: 'center' }}>
-                <div style={{ fontSize: '2.5rem', marginBottom: '.75rem' }}>📚</div>
-                <p style={{ color: 'var(--muted)', marginBottom: '1.2rem', fontWeight: 600 }}>No subjects yet! Add your first course to get started.</p>
-                <Link href="/subjects/new" className="btn-primary">+ Create Subject</Link>
+                <div style={{ width: '48px', height: '48px', background: 'var(--surface2)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto .75rem' }}>
+                  <BookOpen size={22} color="var(--muted)" />
+                </div>
+                <p style={{ color: 'var(--muted)', marginBottom: '1.2rem', fontWeight: 600 }}>No subjects yet. Add your first course to get started.</p>
+                <Link href="/subjects/new" className="btn-primary">Create Subject</Link>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
@@ -168,12 +237,14 @@ export default function Dashboard() {
           <div className="fade-up-4">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ fontWeight: 900, fontSize: '1.1rem' }}>Deadlines</h2>
-              <Link href="/calendar" style={{ color: 'var(--accent)', fontWeight: 800, fontSize: '.85rem' }}>Calendar →</Link>
+              <Link href="/calendar" style={{ color: 'var(--accent)', fontWeight: 800, fontSize: '.85rem' }}>Calendar</Link>
             </div>
             {deadlines.length === 0 ? (
               <div style={{ border: '2.5px dashed var(--border2)', borderRadius: '20px', padding: '2.5rem', textAlign: 'center' }}>
-                <div style={{ fontSize: '2rem', marginBottom: '.5rem' }}>🎉</div>
-                <p style={{ color: 'var(--muted)', fontSize: '.88rem', fontWeight: 600 }}>No upcoming deadlines!</p>
+                <div style={{ width: '48px', height: '48px', background: 'var(--surface2)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto .75rem' }}>
+                  <Calendar size={22} color="var(--muted)" />
+                </div>
+                <p style={{ color: 'var(--muted)', fontSize: '.88rem', fontWeight: 600 }}>No upcoming deadlines</p>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
@@ -187,7 +258,7 @@ export default function Dashboard() {
                         <div style={{ color: 'var(--muted)', fontSize: '.75rem', fontWeight: 600, marginTop: '.1rem' }}>{evt.deadline}</div>
                       </div>
                       <span style={{ marginLeft: '.75rem', flexShrink: 0, padding: '.25rem .75rem', borderRadius: '99px', fontWeight: 800, fontSize: '.78rem', background: urgent ? '#fdecea' : soon ? '#fdf6e0' : 'var(--accent-light)', color: urgent ? '#c0392b' : soon ? '#b8860b' : 'var(--text2)' }}>
-                        {evt.daysLeft === 0 ? '🔥 TODAY' : `${evt.daysLeft}d left`}
+                        {evt.daysLeft === 0 ? 'Today' : `${evt.daysLeft}d`}
                       </span>
                     </div>
                   )

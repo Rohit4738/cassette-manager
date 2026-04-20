@@ -161,7 +161,7 @@ export default function LoginPage() {
               value={username}
               onChange={e => setUsername(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleUsername()}
-              placeholder="e.g. rohit_4738"
+              placeholder="e.g. name_6767"
               style={{ marginBottom: '1rem', fontSize: '1rem' }}
             />
 

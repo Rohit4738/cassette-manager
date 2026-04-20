@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import '@/app/globals.css'
+import { ArrowLeft, BookOpen } from 'lucide-react'
 
 export default function NewSubject() {
   const router = useRouter()
@@ -16,45 +16,46 @@ export default function NewSubject() {
     if (!name.trim()) { setError('Subject name is required'); return }
     setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { router.push('/login'); return }
+    if (!session) { router.replace('/login'); return }
     const { error } = await supabase.from('subjects').insert({ name, professor, user_id: session.user.id })
     if (error) { setError(error.message); setLoading(false); return }
     router.push('/subjects')
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', fontFamily: 'var(--font-body)', color: 'var(--text)' }}>
-      <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem 2.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
-        <Link href="/subjects" style={{ color: 'var(--muted)', fontSize: '0.85rem', fontFamily: 'var(--font-mono)' }}>← Subjects</Link>
-        <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem' }}>New Subject</span>
-        <div style={{ width: '80px' }} />
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', fontFamily: 'Nunito, sans-serif', color: 'var(--text)' }}>
+      <nav style={{ background: 'var(--surface)', borderBottom: '2px solid var(--border)', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '64px' }}>
+          <Link href="/subjects" style={{ display: 'flex', alignItems: 'center', gap: '.5rem', color: 'var(--muted)', fontWeight: 700, fontSize: '.88rem' }}>
+            <ArrowLeft size={16} /> Subjects
+          </Link>
+          <span style={{ fontWeight: 900, fontSize: '1.05rem' }}>New Subject</span>
+          <div style={{ width: '80px' }} />
+        </div>
       </nav>
 
-      <main style={{ maxWidth: '520px', margin: '5rem auto', padding: '0 2rem' }}>
+      <main style={{ maxWidth: '520px', margin: '4rem auto', padding: '0 1.5rem' }}>
         <div className="fade-up">
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', marginBottom: '0.5rem' }}>New Subject</h1>
-          <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '2.5rem' }}>Add a course to your study manager</p>
+          <div style={{ width: '52px', height: '52px', background: 'var(--accent-light)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem' }}>
+            <BookOpen size={24} color="var(--accent)" />
+          </div>
+          <h1 style={{ fontWeight: 900, fontSize: '1.8rem', marginBottom: '.4rem' }}>New Subject</h1>
+          <p style={{ color: 'var(--muted)', fontWeight: 600, marginBottom: '2.5rem' }}>Add a course to your study manager</p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '1.5rem' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--muted)', marginBottom: '0.5rem', letterSpacing: '0.08em' }}>SUBJECT NAME *</label>
-              <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCreate()} placeholder="e.g. Mathematics, Physics..." style={{ width: '100%', padding: '0.85rem 1rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text)', fontSize: '0.95rem', outline: 'none' }}
-                onFocus={e => e.target.style.borderColor = 'var(--text)'}
-                onBlur={e => e.target.style.borderColor = 'var(--border)'}
-              />
+              <label style={{ display: 'block', fontSize: '.75rem', fontWeight: 800, color: 'var(--text2)', marginBottom: '.5rem', letterSpacing: '.06em' }}>SUBJECT NAME *</label>
+              <input className="input-field" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCreate()} placeholder="e.g. Mathematics, Physics, History..." />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--muted)', marginBottom: '0.5rem', letterSpacing: '0.08em' }}>PROFESSOR NAME</label>
-              <input value={professor} onChange={e => setProfessor(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCreate()} placeholder="e.g. Dr. Smith" style={{ width: '100%', padding: '0.85rem 1rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text)', fontSize: '0.95rem', outline: 'none' }}
-                onFocus={e => e.target.style.borderColor = 'var(--text)'}
-                onBlur={e => e.target.style.borderColor = 'var(--border)'}
-              />
+              <label style={{ display: 'block', fontSize: '.75rem', fontWeight: 800, color: 'var(--text2)', marginBottom: '.5rem', letterSpacing: '.06em' }}>PROFESSOR NAME</label>
+              <input className="input-field" value={professor} onChange={e => setProfessor(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCreate()} placeholder="e.g. Dr. Johnson" />
             </div>
           </div>
 
-          {error && <div style={{ background: '#fdf2f2', border: '1px solid #f5c6c6', borderRadius: 'var(--radius)', padding: '0.7rem 1rem', marginBottom: '1rem', color: 'var(--danger)', fontSize: '0.85rem', fontFamily: 'var(--font-mono)' }}>{error}</div>}
+          {error && <div style={{ background: '#fdecea', border: '1.5px solid #ffbbb5', borderRadius: '14px', padding: '.8rem 1rem', marginBottom: '1rem', color: '#c0392b', fontSize: '.85rem', fontWeight: 700 }}>{error}</div>}
 
-          <button onClick={handleCreate} disabled={loading} style={{ width: '100%', padding: '0.9rem', background: 'var(--accent)', color: 'var(--accent-fg)', border: 'none', borderRadius: 'var(--radius)', fontSize: '0.9rem', fontWeight: '600', opacity: loading ? 0.6 : 1 }}>
+          <button className="btn-primary" onClick={handleCreate} disabled={loading} style={{ width: '100%', padding: '.9rem', fontSize: '1rem' }}>
             {loading ? 'Creating...' : 'Create Subject'}
           </button>
         </div>
