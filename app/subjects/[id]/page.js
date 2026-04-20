@@ -1,8 +1,9 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import { ArrowLeft, Plus, Trash2, CheckSquare, Square, FolderPlus, Folder, FileText, Image, Film, File, Link as LinkIcon, X, Upload } from 'lucide-react'
 
 export default function SubjectPage() {
   const router = useRouter()
@@ -13,42 +14,65 @@ export default function SubjectPage() {
   const [folders, setFolders] = useState([])
   const [notes, setNotes] = useState([])
   const [media, setMedia] = useState([])
+  const [mediaFolders, setMediaFolders] = useState([])
   const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState(null)
+
+  // Todo state
   const [newTodo, setNewTodo] = useState('')
-  const [newNote, setNewNote] = useState('')
   const [newFolder, setNewFolder] = useState('')
-  const [newMediaTitle, setNewMediaTitle] = useState('')
-  const [newMediaUrl, setNewMediaUrl] = useState('')
-  const [newMediaType, setNewMediaType] = useState('link')
   const [selectedFolder, setSelectedFolder] = useState(null)
+
+  // Notes state
+  const [newNote, setNewNote] = useState('')
+  const [editingNote, setEditingNote] = useState(null)
+  const [editNoteContent, setEditNoteContent] = useState('')
+
+  // Media state
+  const [selectedMediaFolder, setSelectedMediaFolder] = useState(null)
+  const [newMediaFolder, setNewMediaFolder] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState('')
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     const load = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
-      const { data: sub } = await supabase.from('subjects').select('*').eq('id', id).single()
-      const { data: td } = await supabase.from('todos').select('*').eq('subject_id', id).order('created_at')
-      const { data: fl } = await supabase.from('todo_folders').select('*').eq('subject_id', id)
-      const { data: nt } = await supabase.from('notes').select('*').eq('subject_id', id).order('created_at')
-      const { data: md } = await supabase.from('media').select('*').eq('subject_id', id).order('created_at')
+      if (!session) { router.replace('/login'); return }
+      setUserId(session.user.id)
+
+      const { data: prof } = await supabase.from('profiles').select('theme').eq('id', session.user.id).maybeSingle()
+      document.documentElement.setAttribute('data-theme', prof?.theme || 'clean-white')
+
+      const [{ data: sub }, { data: td }, { data: fl }, { data: nt }, { data: md }, { data: mf }] = await Promise.all([
+        supabase.from('subjects').select('*').eq('id', id).single(),
+        supabase.from('todos').select('*').eq('subject_id', id).order('created_at'),
+        supabase.from('todo_folders').select('*').eq('subject_id', id),
+        supabase.from('notes').select('*').eq('subject_id', id).order('created_at'),
+        supabase.from('media').select('*').eq('subject_id', id).order('created_at'),
+        supabase.from('media_folders').select('*').eq('subject_id', id),
+      ])
+
       setSubject(sub)
       setTodos(td || [])
       setFolders(fl || [])
       setNotes(nt || [])
       setMedia(md || [])
+      setMediaFolders(mf || [])
       setLoading(false)
     }
     load()
   }, [id])
 
+  // ── PROGRESS ──────────────────────────────────
   const totalTodos = todos.length
   const completedTodos = todos.filter(t => t.completed).length
   const progress = totalTodos === 0 ? 0 : Math.round((completedTodos / totalTodos) * 100)
 
+  // ── TODOS ─────────────────────────────────────
   const addTodo = async () => {
     if (!newTodo.trim()) return
-    const { data: { session } } = await supabase.auth.getSession()
-    const { data } = await supabase.from('todos').insert({ title: newTodo, subject_id: id, user_id: session.user.id, folder_id: selectedFolder }).select().single()
+    const { data } = await supabase.from('todos').insert({ title: newTodo, subject_id: id, user_id: userId, folder_id: selectedFolder }).select().single()
     setTodos([...todos, data])
     setNewTodo('')
   }
@@ -65,23 +89,31 @@ export default function SubjectPage() {
 
   const addFolder = async () => {
     if (!newFolder.trim()) return
-    const { data: { session } } = await supabase.auth.getSession()
-    const { data } = await supabase.from('todo_folders').insert({ name: newFolder, subject_id: id, user_id: session.user.id }).select().single()
+    const { data } = await supabase.from('todo_folders').insert({ name: newFolder, subject_id: id, user_id: userId }).select().single()
     setFolders([...folders, data])
     setNewFolder('')
   }
 
   const deleteFolder = async (folderId) => {
+    if (!confirm('Delete this folder and all its tasks?')) return
     await supabase.from('todo_folders').delete().eq('id', folderId)
     setFolders(folders.filter(f => f.id !== folderId))
+    setTodos(todos.filter(t => t.folder_id !== folderId))
+    if (selectedFolder === folderId) setSelectedFolder(null)
   }
 
+  // ── NOTES ─────────────────────────────────────
   const addNote = async () => {
     if (!newNote.trim()) return
-    const { data: { session } } = await supabase.auth.getSession()
-    const { data } = await supabase.from('notes').insert({ content: newNote, subject_id: id, user_id: session.user.id }).select().single()
+    const { data } = await supabase.from('notes').insert({ content: newNote, subject_id: id, user_id: userId }).select().single()
     setNotes([...notes, data])
     setNewNote('')
+  }
+
+  const saveNote = async (noteId) => {
+    await supabase.from('notes').update({ content: editNoteContent }).eq('id', noteId)
+    setNotes(notes.map(n => n.id === noteId ? { ...n, content: editNoteContent } : n))
+    setEditingNote(null)
   }
 
   const deleteNote = async (noteId) => {
@@ -89,161 +121,339 @@ export default function SubjectPage() {
     setNotes(notes.filter(n => n.id !== noteId))
   }
 
-  const addMedia = async () => {
-    if (!newMediaUrl.trim()) return
-    const { data: { session } } = await supabase.auth.getSession()
-    const { data } = await supabase.from('media').insert({ title: newMediaTitle, url: newMediaUrl, type: newMediaType, subject_id: id, user_id: session.user.id }).select().single()
-    setMedia([...media, data])
-    setNewMediaTitle('')
-    setNewMediaUrl('')
+  // ── MEDIA ─────────────────────────────────────
+  const handleFileUpload = async (files) => {
+    if (!files || files.length === 0) return
+    setUploading(true)
+
+    for (const file of files) {
+      setUploadProgress(`Uploading ${file.name}...`)
+      const ext = file.name.split('.').pop()
+      const path = `${userId}/${id}/${Date.now()}_${file.name}`
+
+      const { data: uploadData, error } = await supabase.storage.from('media').upload(path, file)
+      if (error) { console.error(error); continue }
+
+      const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(path)
+
+      let type = 'file'
+      if (file.type.startsWith('image/')) type = 'image'
+      else if (file.type.startsWith('video/')) type = 'video'
+      else if (file.type === 'application/pdf') type = 'pdf'
+      else if (file.type.includes('document') || file.type.includes('word')) type = 'doc'
+
+      const { data } = await supabase.from('media').insert({
+        subject_id: id, user_id: userId,
+        type, url: publicUrl, title: file.name,
+        folder_id: selectedMediaFolder
+      }).select().single()
+
+      setMedia(prev => [...prev, data])
+    }
+
+    setUploading(false)
+    setUploadProgress('')
   }
 
-  const deleteMedia = async (mediaId) => {
-    await supabase.from('media').delete().eq('id', mediaId)
-    setMedia(media.filter(m => m.id !== mediaId))
+  const addMediaFolder = async () => {
+    if (!newMediaFolder.trim()) return
+    const { data } = await supabase.from('media_folders').insert({ name: newMediaFolder, subject_id: id, user_id: userId }).select().single()
+    setMediaFolders([...mediaFolders, data])
+    setNewMediaFolder('')
   }
 
-  if (loading) return <div style={loadingStyle}>Loading...</div>
+  const deleteMedia = async (item) => {
+    // Delete from storage if it's an uploaded file
+    if (item.url.includes('supabase')) {
+      const path = item.url.split('/media/')[1]
+      if (path) await supabase.storage.from('media').remove([path])
+    }
+    await supabase.from('media').delete().eq('id', item.id)
+    setMedia(media.filter(m => m.id !== item.id))
+  }
 
-  const filteredTodos = selectedFolder ? todos.filter(t => t.folder_id === selectedFolder) : todos.filter(t => !t.folder_id)
+  const deleteMediaFolder = async (folderId) => {
+    if (!confirm('Delete this folder? Files inside will be moved to root.')) return
+    await supabase.from('media_folders').delete().eq('id', folderId)
+    setMediaFolders(mediaFolders.filter(f => f.id !== folderId))
+    setMedia(media.map(m => m.folder_id === folderId ? { ...m, folder_id: null } : m))
+    if (selectedMediaFolder === folderId) setSelectedMediaFolder(null)
+  }
+
+  const getMediaIcon = (type) => {
+    if (type === 'image') return <Image size={18} color="var(--accent)" />
+    if (type === 'video') return <Film size={18} color="#7c3aed" />
+    if (type === 'pdf') return <FileText size={18} color="#dc2626" />
+    if (type === 'doc') return <File size={18} color="#2563eb" />
+    return <LinkIcon size={18} color="var(--muted)" />
+  }
+
+  if (loading) return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Nunito, sans-serif' }}>
+      <p style={{ color: 'var(--muted)', fontWeight: 600 }}>Loading...</p>
+    </div>
+  )
+
+  const filteredTodos = selectedFolder
+    ? todos.filter(t => t.folder_id === selectedFolder)
+    : todos.filter(t => !t.folder_id)
+
+  const filteredMedia = selectedMediaFolder
+    ? media.filter(m => m.folder_id === selectedMediaFolder)
+    : media.filter(m => !m.folder_id)
 
   return (
-    <div style={pageStyle}>
-      <div style={headerStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <Link href="/subjects" style={backBtn}>← Back</Link>
-          <div>
-            <h1 style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>{subject?.name}</h1>
-            <p style={{ color: '#888', fontSize: '0.8rem' }}>Prof. {subject?.professor || 'N/A'}</p>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', fontFamily: 'Nunito, sans-serif', color: 'var(--text)' }}>
+
+      {/* Nav */}
+      <nav style={{ background: 'var(--surface)', borderBottom: '2px solid var(--border)', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '0 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '64px' }}>
+          <Link href="/subjects" style={{ display: 'flex', alignItems: 'center', gap: '.5rem', color: 'var(--muted)', fontWeight: 700, fontSize: '.88rem' }}>
+            <ArrowLeft size={16} /> Subjects
+          </Link>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontWeight: 900, fontSize: '1rem' }}>{subject?.name}</div>
+            {subject?.professor && <div style={{ color: 'var(--muted)', fontSize: '.75rem', fontWeight: 600 }}>Prof. {subject.professor}</div>}
+          </div>
+          <div style={{ width: '80px' }} />
+        </div>
+      </nav>
+
+      {/* Progress bar */}
+      <div style={{ background: 'var(--surface)', borderBottom: '2px solid var(--border)', padding: '1rem 1.5rem' }}>
+        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '.4rem' }}>
+            <span style={{ color: 'var(--muted)', fontSize: '.82rem', fontWeight: 700 }}>Progress</span>
+            <span style={{ fontWeight: 900, fontSize: '.82rem', color: 'var(--accent)' }}>{progress}% · {completedTodos}/{totalTodos} tasks</span>
+          </div>
+          <div className="progress-track" style={{ height: '8px' }}>
+            <div className="progress-fill" style={{ width: `${progress}%` }} />
           </div>
         </div>
-      </div>
-
-      {/* Progress Bar */}
-      <div style={{ padding: '1rem 2rem', background: '#111', borderBottom: '1px solid #222' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-          <span style={{ color: '#888', fontSize: '0.85rem' }}>Progress</span>
-          <span style={{ color: '#7c6fcd', fontWeight: 'bold' }}>{progress}%</span>
-        </div>
-        <div style={{ background: '#2a2a2a', borderRadius: '999px', height: '8px' }}>
-          <div style={{ background: '#7c6fcd', width: `${progress}%`, height: '8px', borderRadius: '999px', transition: 'width 0.3s' }} />
-        </div>
-        <p style={{ color: '#555', fontSize: '0.8rem', marginTop: '0.4rem' }}>{completedTodos}/{totalTodos} tasks completed</p>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #222', padding: '0 2rem' }}>
-        {['todos', 'notes', 'media'].map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ ...tabBtn, ...(tab === t ? activeTab : {}) }}>
-            {t === 'todos' ? '✅ To-Do' : t === 'notes' ? '🧠 Notes' : '🖼️ Media'}
-          </button>
-        ))}
+      <div style={{ background: 'var(--surface)', borderBottom: '2px solid var(--border)' }}>
+        <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '0 1.5rem', display: 'flex', gap: '.25rem' }}>
+          {[
+            { key: 'todos', label: 'To-Do' },
+            { key: 'notes', label: 'Notes' },
+            { key: 'media', label: 'Media' },
+          ].map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)} style={{ padding: '.85rem 1.2rem', background: 'none', border: 'none', fontWeight: 800, fontSize: '.88rem', cursor: 'pointer', color: tab === t.key ? 'var(--accent)' : 'var(--muted)', borderBottom: `2px solid ${tab === t.key ? 'var(--accent)' : 'transparent'}`, marginBottom: '-2px', transition: 'color .15s' }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div style={contentStyle}>
+      <main style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 1.5rem' }}>
 
-        {/* TODOS TAB */}
+        {/* ── TODOS TAB ── */}
         {tab === 'todos' && (
           <div>
-            {/* Folders */}
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem', alignItems: 'center' }}>
-              <button onClick={() => setSelectedFolder(null)} style={{ ...folderBtn, ...(selectedFolder === null ? activeFolder : {}) }}>All</button>
+            {/* Folder tabs */}
+            <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '1.5rem', alignItems: 'center' }}>
+              <button onClick={() => setSelectedFolder(null)} style={{ display: 'flex', alignItems: 'center', gap: '.3rem', padding: '.4rem .9rem', borderRadius: '99px', border: '2px solid', borderColor: selectedFolder === null ? 'var(--accent)' : 'var(--border)', background: selectedFolder === null ? 'var(--accent-light)' : 'var(--surface)', color: selectedFolder === null ? 'var(--accent)' : 'var(--text2)', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>
+                All tasks
+              </button>
               {folders.map(f => (
-                <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <button onClick={() => setSelectedFolder(f.id)} style={{ ...folderBtn, ...(selectedFolder === f.id ? activeFolder : {}) }}>{f.name}</button>
-                  <button onClick={() => deleteFolder(f.id)} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: '0.8rem' }}>✕</button>
+                <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: '.2rem' }}>
+                  <button onClick={() => setSelectedFolder(f.id)} style={{ display: 'flex', alignItems: 'center', gap: '.3rem', padding: '.4rem .9rem', borderRadius: '99px', border: '2px solid', borderColor: selectedFolder === f.id ? 'var(--accent)' : 'var(--border)', background: selectedFolder === f.id ? 'var(--accent-light)' : 'var(--surface)', color: selectedFolder === f.id ? 'var(--accent)' : 'var(--text2)', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>
+                    <Folder size={13} /> {f.name}
+                  </button>
+                  <button onClick={() => deleteFolder(f.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '.2rem', borderRadius: '6px', display: 'flex', alignItems: 'center' }}>
+                    <X size={13} />
+                  </button>
                 </div>
               ))}
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <input value={newFolder} onChange={e => setNewFolder(e.target.value)} placeholder="New folder..." style={{ ...inputStyle, padding: '0.4rem 0.8rem', fontSize: '0.85rem' }} />
-                <button onClick={addFolder} style={{ ...smallBtn, background: '#333' }}>+ Folder</button>
+
+              {/* Add folder inline */}
+              <div style={{ display: 'flex', gap: '.4rem' }}>
+                <input value={newFolder} onChange={e => setNewFolder(e.target.value)} onKeyDown={e => e.key === 'Enter' && addFolder()} placeholder="New folder..." style={{ padding: '.4rem .8rem', border: '2px solid var(--border)', borderRadius: '99px', background: 'var(--surface2)', color: 'var(--text)', fontSize: '.82rem', outline: 'none', width: '130px' }} />
+                <button onClick={addFolder} style={{ display: 'flex', alignItems: 'center', gap: '.3rem', padding: '.4rem .8rem', borderRadius: '99px', background: 'var(--surface)', border: '2px solid var(--border)', color: 'var(--text2)', fontWeight: 700, fontSize: '.78rem', cursor: 'pointer' }}>
+                  <FolderPlus size={13} /> Add
+                </button>
               </div>
             </div>
 
-            {/* Add Todo */}
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
-              <input value={newTodo} onChange={e => setNewTodo(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTodo()} placeholder={`Add task${selectedFolder ? ' to ' + folders.find(f => f.id === selectedFolder)?.name : ''}...`} style={inputStyle} />
-              <button onClick={addTodo} style={smallBtn}>Add</button>
+            {/* Add todo */}
+            <div style={{ display: 'flex', gap: '.75rem', marginBottom: '1.5rem' }}>
+              <input value={newTodo} onChange={e => setNewTodo(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTodo()} placeholder={selectedFolder ? `Add task to "${folders.find(f => f.id === selectedFolder)?.name}"...` : 'Add a task...'} className="input-field" />
+              <button onClick={addTodo} className="btn-primary" style={{ padding: '.7rem 1.2rem', borderRadius: '12px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                <Plus size={16} /> Add
+              </button>
             </div>
 
-            {/* Todo List */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {filteredTodos.length === 0 && <p style={{ color: '#555' }}>No tasks here yet.</p>}
+            {/* Todo list */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+              {filteredTodos.length === 0 && (
+                <div style={{ border: '2px dashed var(--border2)', borderRadius: '16px', padding: '2.5rem', textAlign: 'center', color: 'var(--muted)', fontWeight: 600 }}>
+                  No tasks yet. Add one above!
+                </div>
+              )}
               {filteredTodos.map(todo => (
-                <div key={todo.id} style={todoItem}>
-                  <input type="checkbox" checked={todo.completed} onChange={() => toggleTodo(todo)} style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
-                  <span style={{ flex: 1, textDecoration: todo.completed ? 'line-through' : 'none', color: todo.completed ? '#555' : 'white' }}>{todo.title}</span>
-                  <button onClick={() => deleteTodo(todo.id)} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer' }}>🗑️</button>
+                <div key={todo.id} style={{ display: 'flex', alignItems: 'center', gap: '.9rem', background: 'var(--surface)', border: '2px solid var(--border)', borderRadius: '14px', padding: '.8rem 1.1rem', transition: 'border-color .15s' }}>
+                  <button onClick={() => toggleTodo(todo)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: todo.completed ? 'var(--accent)' : 'var(--border2)', display: 'flex', flexShrink: 0 }}>
+                    {todo.completed ? <CheckSquare size={20} /> : <Square size={20} />}
+                  </button>
+                  <span style={{ flex: 1, fontWeight: 600, textDecoration: todo.completed ? 'line-through' : 'none', color: todo.completed ? 'var(--muted)' : 'var(--text)' }}>{todo.title}</span>
+                  <button onClick={() => deleteTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: '.2rem', borderRadius: '6px' }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#c0392b'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* NOTES TAB */}
+        {/* ── NOTES TAB ── */}
         {tab === 'notes' && (
           <div>
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
-              <input value={newNote} onChange={e => setNewNote(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNote()} placeholder="Add a note..." style={inputStyle} />
-              <button onClick={addNote} style={smallBtn}>Add</button>
+            <div style={{ display: 'flex', gap: '.75rem', marginBottom: '1.5rem' }}>
+              <input value={newNote} onChange={e => setNewNote(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNote()} placeholder="Add a note..." className="input-field" />
+              <button onClick={addNote} className="btn-primary" style={{ padding: '.7rem 1.2rem', borderRadius: '12px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                <Plus size={16} /> Add
+              </button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {notes.length === 0 && <p style={{ color: '#555' }}>No notes yet.</p>}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
+              {notes.length === 0 && (
+                <div style={{ border: '2px dashed var(--border2)', borderRadius: '16px', padding: '2.5rem', textAlign: 'center', color: 'var(--muted)', fontWeight: 600 }}>
+                  No notes yet. Add one above!
+                </div>
+              )}
               {notes.map(note => (
-                <div key={note.id} style={noteItem}>
-                  <p style={{ flex: 1, margin: 0 }}>{note.content}</p>
-                  <button onClick={() => deleteNote(note.id)} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer' }}>🗑️</button>
+                <div key={note.id} style={{ background: 'var(--surface)', border: '2px solid var(--border)', borderRadius: '14px', padding: '1rem 1.2rem' }}>
+                  {editingNote === note.id ? (
+                    <div style={{ display: 'flex', gap: '.6rem', flexDirection: 'column' }}>
+                      <textarea value={editNoteContent} onChange={e => setEditNoteContent(e.target.value)} style={{ width: '100%', minHeight: '80px', padding: '.7rem', border: '2px solid var(--accent)', borderRadius: '10px', background: 'var(--surface2)', color: 'var(--text)', fontSize: '.9rem', resize: 'vertical', outline: 'none', fontFamily: 'Nunito, sans-serif' }} />
+                      <div style={{ display: 'flex', gap: '.5rem' }}>
+                        <button onClick={() => saveNote(note.id)} className="btn-primary" style={{ padding: '.45rem 1rem', borderRadius: '8px', fontSize: '.82rem' }}>Save</button>
+                        <button onClick={() => setEditingNote(null)} style={{ padding: '.45rem 1rem', borderRadius: '8px', border: '2px solid var(--border)', background: 'var(--surface)', color: 'var(--text2)', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.9rem' }}>
+                      <p style={{ flex: 1, fontWeight: 600, lineHeight: 1.6, margin: 0 }}>{note.content}</p>
+                      <div style={{ display: 'flex', gap: '.3rem', flexShrink: 0 }}>
+                        <button onClick={() => { setEditingNote(note.id); setEditNoteContent(note.content) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '.2rem', borderRadius: '6px', display: 'flex' }}
+                          onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+                          onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+                        >
+                          <FileText size={15} />
+                        </button>
+                        <button onClick={() => deleteNote(note.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '.2rem', borderRadius: '6px', display: 'flex' }}
+                          onMouseEnter={e => e.currentTarget.style.color = '#c0392b'}
+                          onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* MEDIA TAB */}
+        {/* ── MEDIA TAB ── */}
         {tab === 'media' && (
           <div>
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-              <select value={newMediaType} onChange={e => setNewMediaType(e.target.value)} style={{ ...inputStyle, width: 'auto' }}>
-                <option value="link">🔗 Link</option>
-                <option value="image">🖼️ Image URL</option>
-                <option value="pdf">📄 PDF URL</option>
-              </select>
-              <input value={newMediaTitle} onChange={e => setNewMediaTitle(e.target.value)} placeholder="Title (optional)" style={{ ...inputStyle, flex: 1 }} />
-              <input value={newMediaUrl} onChange={e => setNewMediaUrl(e.target.value)} placeholder="URL..." style={{ ...inputStyle, flex: 2 }} />
-              <button onClick={addMedia} style={smallBtn}>Add</button>
-            </div>
-            <div style={gridStyle}>
-              {media.length === 0 && <p style={{ color: '#555' }}>No media yet.</p>}
-              {media.map(m => (
-                <div key={m.id} style={mediaCard}>
-                  <div style={{ fontSize: '1.5rem' }}>{m.type === 'image' ? '🖼️' : m.type === 'pdf' ? '📄' : '🔗'}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{m.title || 'Untitled'}</div>
-                    <a href={m.url} target="_blank" rel="noreferrer" style={{ color: '#7c6fcd', fontSize: '0.8rem', wordBreak: 'break-all' }}>{m.url}</a>
-                  </div>
-                  <button onClick={() => deleteMedia(m.id)} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer' }}>🗑️</button>
+            {/* Media folder tabs */}
+            <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '1.5rem', alignItems: 'center' }}>
+              <button onClick={() => setSelectedMediaFolder(null)} style={{ padding: '.4rem .9rem', borderRadius: '99px', border: '2px solid', borderColor: selectedMediaFolder === null ? 'var(--accent)' : 'var(--border)', background: selectedMediaFolder === null ? 'var(--accent-light)' : 'var(--surface)', color: selectedMediaFolder === null ? 'var(--accent)' : 'var(--text2)', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>
+                All files
+              </button>
+              {mediaFolders.map(f => (
+                <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: '.2rem' }}>
+                  <button onClick={() => setSelectedMediaFolder(f.id)} style={{ display: 'flex', alignItems: 'center', gap: '.3rem', padding: '.4rem .9rem', borderRadius: '99px', border: '2px solid', borderColor: selectedMediaFolder === f.id ? 'var(--accent)' : 'var(--border)', background: selectedMediaFolder === f.id ? 'var(--accent-light)' : 'var(--surface)', color: selectedMediaFolder === f.id ? 'var(--accent)' : 'var(--text2)', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>
+                    <Folder size={13} /> {f.name}
+                  </button>
+                  <button onClick={() => deleteMediaFolder(f.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '.2rem', borderRadius: '6px', display: 'flex' }}>
+                    <X size={13} />
+                  </button>
                 </div>
               ))}
+              <div style={{ display: 'flex', gap: '.4rem' }}>
+                <input value={newMediaFolder} onChange={e => setNewMediaFolder(e.target.value)} onKeyDown={e => e.key === 'Enter' && addMediaFolder()} placeholder="New folder..." style={{ padding: '.4rem .8rem', border: '2px solid var(--border)', borderRadius: '99px', background: 'var(--surface2)', color: 'var(--text)', fontSize: '.82rem', outline: 'none', width: '130px' }} />
+                <button onClick={addMediaFolder} style={{ display: 'flex', alignItems: 'center', gap: '.3rem', padding: '.4rem .8rem', borderRadius: '99px', background: 'var(--surface)', border: '2px solid var(--border)', color: 'var(--text2)', fontWeight: 700, fontSize: '.78rem', cursor: 'pointer' }}>
+                  <FolderPlus size={13} /> Add
+                </button>
+              </div>
             </div>
+
+            {/* Upload area */}
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--accent)' }}
+              onDragLeave={e => e.currentTarget.style.borderColor = 'var(--border2)'}
+              onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border2)'; handleFileUpload(e.dataTransfer.files) }}
+              style={{ border: '2.5px dashed var(--border2)', borderRadius: '18px', padding: '2.5rem', textAlign: 'center', cursor: 'pointer', marginBottom: '1.5rem', transition: 'border-color .2s, background .2s' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-light)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.background = 'transparent' }}
+            >
+              <input ref={fileInputRef} type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx" style={{ display: 'none' }} onChange={e => handleFileUpload(e.target.files)} />
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '.75rem' }}>
+                <Upload size={28} color="var(--muted)" />
+              </div>
+              {uploading ? (
+                <p style={{ color: 'var(--accent)', fontWeight: 700, fontSize: '.9rem' }}>{uploadProgress}</p>
+              ) : (
+                <>
+                  <p style={{ fontWeight: 700, color: 'var(--text2)', marginBottom: '.25rem' }}>Click to upload or drag and drop</p>
+                  <p style={{ color: 'var(--muted)', fontSize: '.82rem', fontWeight: 600 }}>Images, Videos, PDFs, Word documents</p>
+                </>
+              )}
+            </div>
+
+            {/* Media grid */}
+            {filteredMedia.length === 0 ? (
+              <div style={{ border: '2px dashed var(--border2)', borderRadius: '16px', padding: '2.5rem', textAlign: 'center', color: 'var(--muted)', fontWeight: 600 }}>
+                No files here yet. Upload something above!
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+                {filteredMedia.map(item => (
+                  <div key={item.id} style={{ background: 'var(--surface)', border: '2px solid var(--border)', borderRadius: '16px', overflow: 'hidden', transition: 'border-color .2s, transform .2s' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'translateY(0)' }}
+                  >
+                    {/* Preview */}
+                    {item.type === 'image' ? (
+                      <img src={item.url} alt={item.title} style={{ width: '100%', height: '130px', objectFit: 'cover', display: 'block' }} />
+                    ) : item.type === 'video' ? (
+                      <video src={item.url} style={{ width: '100%', height: '130px', objectFit: 'cover', display: 'block' }} controls />
+                    ) : (
+                      <div style={{ height: '130px', background: 'var(--surface2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {getMediaIcon(item.type)}
+                      </div>
+                    )}
+                    <div style={{ padding: '.75rem' }}>
+                      <a href={item.url} target="_blank" rel="noreferrer" style={{ fontWeight: 700, fontSize: '.82rem', color: 'var(--text)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '.4rem' }}>
+                        {item.title || 'Untitled'}
+                      </a>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '.72rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>{item.type}</span>
+                        <button onClick={() => deleteMedia(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: '.2rem' }}
+                          onMouseEnter={e => e.currentTarget.style.color = '#c0392b'}
+                          onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
-      </div>
+      </main>
     </div>
   )
 }
-
-const pageStyle = { minHeight: '100vh', background: '#0f0f0f', color: 'white', fontFamily: 'sans-serif' }
-const headerStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 2rem', borderBottom: '1px solid #222', position: 'sticky', top: 0, background: '#0f0f0f', zIndex: 10 }
-const contentStyle = { padding: '2rem', maxWidth: '900px', margin: '0 auto' }
-const backBtn = { color: '#888', textDecoration: 'none' }
-const tabBtn = { background: 'none', border: 'none', color: '#666', padding: '1rem 1.5rem', cursor: 'pointer', fontSize: '0.9rem', borderBottom: '2px solid transparent' }
-const activeTab = { color: '#7c6fcd', borderBottom: '2px solid #7c6fcd' }
-const inputStyle = { flex: 1, padding: '0.65rem 1rem', background: '#1a1a1a', border: '1px solid #333', borderRadius: '8px', color: 'white', fontSize: '0.95rem' }
-const smallBtn = { padding: '0.65rem 1.2rem', background: '#7c6fcd', border: 'none', borderRadius: '8px', color: 'white', cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap' }
-const todoItem = { display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#1a1a1a', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #2a2a2a' }
-const noteItem = { display: 'flex', alignItems: 'flex-start', gap: '0.75rem', background: '#1a1a1a', padding: '1rem', borderRadius: '8px', border: '1px solid #2a2a2a' }
-const mediaCard = { display: 'flex', alignItems: 'flex-start', gap: '0.75rem', background: '#1a1a1a', padding: '1rem', borderRadius: '8px', border: '1px solid #2a2a2a' }
-const gridStyle = { display: 'flex', flexDirection: 'column', gap: '0.75rem' }
-const folderBtn = { background: '#1a1a1a', border: '1px solid #333', color: '#888', padding: '0.3rem 0.8rem', borderRadius: '999px', cursor: 'pointer', fontSize: '0.85rem' }
-const activeFolder = { background: '#7c6fcd', color: 'white', border: '1px solid #7c6fcd' }
-const loadingStyle = { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f0f0f', color: 'white', fontFamily: 'sans-serif' }
